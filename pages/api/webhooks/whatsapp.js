@@ -11,11 +11,6 @@ export default function handler(req, res) {
     console.log('Handling webhook verification...');
     const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-    // --- START OF DEBUGGING CODE ---
-    // Log the token from the environment variables to see what the server is using.
-    console.log(`Server's Verify Token: "${verifyToken}"`);
-    // --- END OF DEBUGGING CODE ---
-
     // Parse the query params
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -29,9 +24,13 @@ export default function handler(req, res) {
         console.log('Webhook verified successfully!');
         res.status(200).send(challenge);
       } else {
-        // Respond with '403 Forbidden' if verify tokens do not match
-        console.error('Webhook verification failed: Tokens do not match.');
-        res.status(403).end();
+        // --- START OF DEBUGGING CHANGE ---
+        // Respond with a detailed error message, including the token the server is using.
+        // This helps debug without relying on delayed logs.
+        const errorMessage = `Verification failed. The token sent by Meta ("${token}") does not match the token on the server ("${verifyToken || 'not set'}").`;
+        console.error(errorMessage);
+        res.status(403).send(errorMessage);
+        // --- END OF DEBUGGING CHANGE ---
       }
     } else {
       // Respond with '400 Bad Request' if mode or token is missing
