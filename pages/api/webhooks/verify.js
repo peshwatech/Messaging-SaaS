@@ -1,4 +1,4 @@
-// File Location: /pages/api/webhooks/whatsapp.js
+// File Location: /pages/api/webhooks/verify.js
 
 // This is the primary webhook endpoint for receiving all events from the WhatsApp Cloud API.
 export default function handler(req, res) {
