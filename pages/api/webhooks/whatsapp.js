@@ -4,34 +4,20 @@
 export default function handler(req, res) {
   // --- Webhook Verification ---
   if (req.method === 'GET') {
-    const serverToken = process.env.WHATSAPP_VERIFY_TOKEN;
-
-    // --- AGGRESSIVE DEBUGGING ---
-    // This will immediately stop the code and send back the token value.
-    // This allows us to see what the server is reading without relying on logs.
-    const debugMessage = `Server's verify token is: "${serverToken || 'UNDEFINED'}"`;
-    res.status(418).send(debugMessage); // Using an unusual status code to be sure it's our new code.
-    return; // Stop further execution
-    // --- END OF DEBUGGING ---
-
-    // The code below will not be reached while debugging is active.
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
+    
+    // --- FINAL DEBUGGING STEP ---
+    // This code ignores the verify token and simply sends back the challenge.
+    // This will help us determine if the connection from Meta to Vercel is working at all.
     const challenge = req.query['hub.challenge'];
-
-    if (mode && token) {
-      if (mode === 'subscribe' && token === serverToken) {
-        console.log('Webhook verified successfully!');
-        res.status(200).send(challenge);
-      } else {
-        const errorMessage = `Verification failed. Meta token ("${token}") != Server token ("${serverToken}").`;
-        console.error(errorMessage);
-        res.status(403).send(errorMessage);
-      }
-    } else {
-      console.error('Webhook verification failed: Missing mode or token.');
-      res.status(400).end();
+    if (challenge) {
+      console.log("Received a challenge. Responding directly.");
+      res.status(200).send(challenge);
+      return;
     }
+    // --- END OF DEBUGGING STEP ---
+
+    // If there's no challenge, it's a bad request.
+    res.status(400).send("No challenge token found.");
   }
 
   // --- Handle Incoming Messages ---
