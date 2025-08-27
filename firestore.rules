@@ -1,0 +1,26 @@
+// File Location: /firestore.rules (in your project root)
+// This file's contents should be copied into your Firebase project's Firestore security rules editor.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Deny all reads and writes by default for security.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // This rule specifically matches any document inside any subcollection of a tenant.
+    // e.g., /tenants/tenant-abc/campaigns/campaign-123
+    // e.g., /tenants/tenant-xyz/contacts/contact-456
+    match /tenants/{tenantId}/{anyCollection}/{docId} {
+      
+      // Allow read and write access ONLY if the requesting user's
+      // authentication token has a custom claim 'tenantId' that
+      // exactly matches the {tenantId} in the document path.
+      // This is the core of our multi-tenant security model.
+      allow read, write: if request.auth.token.tenantId == tenantId;
+    }
+  }
+}
