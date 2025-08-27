@@ -2,38 +2,33 @@
 
 // This is the primary webhook endpoint for receiving all events from the WhatsApp Cloud API.
 export default function handler(req, res) {
-  // Log the request method and query for debugging
-  console.log(`Received a ${req.method} request.`);
-
   // --- Webhook Verification ---
-  // The WhatsApp API sends a GET request to verify your webhook endpoint.
   if (req.method === 'GET') {
-    console.log('Handling webhook verification...');
-    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+    const serverToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-    // Parse the query params
+    // --- AGGRESSIVE DEBUGGING ---
+    // This will immediately stop the code and send back the token value.
+    // This allows us to see what the server is reading without relying on logs.
+    const debugMessage = `Server's verify token is: "${serverToken || 'UNDEFINED'}"`;
+    res.status(418).send(debugMessage); // Using an unusual status code to be sure it's our new code.
+    return; // Stop further execution
+    // --- END OF DEBUGGING ---
+
+    // The code below will not be reached while debugging is active.
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    // Check if a token and mode are in the query string of the request
     if (mode && token) {
-      // Check the mode and token sent are correct
-      if (mode === 'subscribe' && token === verifyToken) {
-        // Respond with the challenge token from the request
+      if (mode === 'subscribe' && token === serverToken) {
         console.log('Webhook verified successfully!');
         res.status(200).send(challenge);
       } else {
-        // --- START OF DEBUGGING CHANGE ---
-        // Respond with a detailed error message, including the token the server is using.
-        // This helps debug without relying on delayed logs.
-        const errorMessage = `Verification failed. The token sent by Meta ("${token}") does not match the token on the server ("${verifyToken || 'not set'}").`;
+        const errorMessage = `Verification failed. Meta token ("${token}") != Server token ("${serverToken}").`;
         console.error(errorMessage);
         res.status(403).send(errorMessage);
-        // --- END OF DEBUGGING CHANGE ---
       }
     } else {
-      // Respond with '400 Bad Request' if mode or token is missing
       console.error('Webhook verification failed: Missing mode or token.');
       res.status(400).end();
     }
