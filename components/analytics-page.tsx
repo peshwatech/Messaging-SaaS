@@ -17,8 +17,18 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
+interface Campaign {
+  contactCount: number;
+  stats?: {
+    delivered: number;
+    read: number;
+  };
+  createdAt: string;
+  templateName: string;
+}
+
 // This component now accepts campaigns as a prop
-export function AnalyticsPage({ campaigns = [] }) {
+export function AnalyticsPage({ campaigns = [] }: { campaigns: Campaign[] }) {
   const [timeRange, setTimeRange] = useState("6months")
 
   // useMemo will re-calculate the data only when the 'campaigns' prop changes.

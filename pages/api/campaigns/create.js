@@ -101,49 +101,37 @@ export default async function handler(req, res) {
             });
 
         const messagesRef = campaignRef.collection('messages');
-
-        // Prepare messages for batch sending
-        const messages = contactNumbers.map(number => ({
-            contact: number,
-            status: 'pending',
-            sentAt: FieldValue.serverTimestamp(),
-            messageId: null // To be updated by the webhook
-        }));
         
-        // A. Loop through contacts and send messages
+        // Loop through contacts and send messages
         for (const number of contactNumbers) {
-            // Placeholder for WhatsApp Cloud API call
-            // In a real application, you would make an API call here.
-            // For example:
-            // const whatsappResponse = await axios.post(
-            //   `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-            //   {
-            //     messaging_product: "whatsapp",
-            //     to: number,
-            //     type: "template",
-            //     template: {
-            //       name: templateName,
-            //       language: { code: "en_US" }
-            //     }
-            //   },
-            //   {
-            //     headers: {
-            //       Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
-            //     }
-            //   }
-            // );
+            const whatsappResponse = await axios.post(
+              `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+              {
+                messaging_product: "whatsapp",
+                to: number,
+                type: "template",
+                template: {
+                  name: templateName,
+                  language: { code: "en_US" }
+                }
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
+                }
+              }
+            );
 
-            // Simulating a successful API response with a mock message ID
-            const mockMessageId = `mock-message-${Math.random().toString(36).substr(2, 9)}`;
-
-            // B. Create a lookup document to map the WhatsApp message ID back to the user and campaign
-            await adminDb.collection('message_lookups').doc(mockMessageId).set({
+            const messageId = whatsappResponse.data.messages[0].id;
+            
+            // Create a lookup document to map the WhatsApp message ID back to the user and campaign
+            await adminDb.collection('message_lookups').doc(messageId).set({
                 userId,
                 campaignId: campaignRef.id
             });
 
-            // C. Save the message to Firestore
-            await messagesRef.doc(mockMessageId).set({
+            // Save the message to Firestore
+            await messagesRef.doc(messageId).set({
                 contact: number,
                 status: 'sent', // Initially sent, will be updated by webhook
                 sentAt: FieldValue.serverTimestamp()
