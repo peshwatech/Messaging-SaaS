@@ -27,6 +27,11 @@ export function CampaignTable({ campaigns, searchTerm, statusFilter, dateRange }
   const itemsPerPage = 5
 
   const filteredCampaigns = useMemo(() => {
+    // Return empty array if campaigns is null or undefined
+    if (!campaigns) {
+      return [];
+    }
+    
     return campaigns.filter((campaign) => {
       const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = statusFilter === "all" || campaign.status === statusFilter
