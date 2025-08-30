@@ -32,6 +32,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
+  console.log("Firebase Project ID (from frontend):", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
   return <CampaignDashboard />;
 }

@@ -1,79 +1,88 @@
 // File Location: /pages/api/campaigns/create.js
 // This API has been updated to be secure and multi-tenant aware.
+import { adminDb } from '../../../lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
 
-import { getAuth } from 'firebase-admin/auth';
-import { Timestamp } from 'firebase-admin/firestore';
-import { initializeAdminApp, adminDb } from '../../../lib/firebaseAdmin'; // We need a new admin config file
-import axios from 'axios';
-
-// Initialize the Firebase Admin SDK
-initializeAdminApp();
+// Ensure the admin app is initialized by importing the config
+import '../../../lib/firebaseAdmin';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ message: 'Method Not Allowed' });
+  // --- 1. Webhook Verification ---
+  if (req.method === 'GET') {
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
+
+    if (mode === 'subscribe' && token === verifyToken) {
+      console.log('Webhook verified successfully!');
+      return res.status(200).send(challenge);
+    } else {
+      console.error('Webhook verification failed.');
+      return res.status(403).end();
+    }
   }
 
-  try {
-    // 1. VERIFY USER TOKEN
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
-    if (!idToken) {
-      return res.status(401).json({ message: 'Unauthorized: No token provided.' });
-    }
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const userId = decodedToken.uid; // This is the user's unique ID, our new tenantId
+  // --- 2. Handle Incoming Status Updates ---
+  if (req.method === 'POST') {
+    const body = req.body;
+    console.log('Received webhook:', JSON.stringify(body, null, 2));
 
-    // 2. VALIDATE REQUEST BODY
-    const { template, contacts } = req.body;
-    if (!template || !contacts || !Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({ message: 'Invalid request body.' });
-    }
-
-    // 3. SAVE CAMPAIGN TO FIRESTORE (under the user's tenant)
-    const campaignData = {
-      templateName: template,
-      contactCount: contacts.length,
-      status: 'in_progress',
-      createdAt: Timestamp.now(),
-    };
-    
-    const campaignRef = await adminDb
-      .collection('tenants')
-      .doc(userId) // Use the authenticated user's UID as the document ID
-      .collection('campaigns')
-      .add(campaignData);
-
-    console.log(`Campaign ${campaignRef.id} logged for user ${userId}`);
-
-    // 4. SEND MESSAGES VIA WHATSAPP API
-    const sendMessagePromises = contacts.map(contactNumber => {
-      return axios.post(
-        `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-        {
-          messaging_product: "whatsapp",
-          to: contactNumber,
-          type: "template",
-          template: { name: template, language: { code: "en_US" } },
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
+    try {
+        const status = body.entry?.[0]?.changes?.[0]?.value?.statuses?.[0];
+        if (!status) {
+            console.log('Not a status update webhook. Acknowledging.');
+            return res.status(200).send('EVENT_RECEIVED');
         }
-      );
-    });
 
-    await Promise.allSettled(sendMessagePromises);
+        const messageId = status.id;
+        const newStatus = status.status; // e.g., 'delivered', 'read', 'failed'
 
-    res.status(200).json({ message: `Campaign created successfully! Attempted to send ${contacts.length} messages.` });
+        // A. Find the message using the lookup collection
+        const lookupRef = adminDb.collection('message_lookups').doc(messageId);
+        const lookupDoc = await lookupRef.get();
 
-  } catch (error) {
-    console.error("Error creating campaign:", error.code ? error.code : error.message);
-    if (error.code === 'auth/id-token-expired') {
-        return res.status(401).json({ message: 'Unauthorized: Token expired.' });
+        if (!lookupDoc.exists) {
+            console.warn(`Could not find lookup for messageId: ${messageId}`);
+            return res.status(200).send('EVENT_RECEIVED_NO_LOOKUP');
+        }
+
+        const { userId, campaignId } = lookupDoc.data();
+
+        // B. Update the specific message document with the new status
+        const messageRef = adminDb
+            .collection('tenants')
+            .doc(userId)
+            .collection('campaigns')
+            .doc(campaignId)
+            .collection('messages')
+            .doc(messageId);
+        
+        await messageRef.update({
+            status: newStatus,
+            updatedAt: FieldValue.serverTimestamp()
+        });
+
+        // C. (Optional but recommended) Increment the campaign's stats counter
+        const campaignRef = adminDb.collection('tenants').doc(userId).collection('campaigns').doc(campaignId);
+        
+        // Use FieldValue.increment to safely update the count
+        // Note: 'failed' status might also come through, you can add a counter for it too.
+        if (newStatus === 'delivered' || newStatus === 'read') {
+             await campaignRef.update({
+                [`stats.${newStatus}`]: FieldValue.increment(1)
+            });
+        }
+        
+        console.log(`Updated message ${messageId} to status '${newStatus}' for campaign ${campaignId}`);
+        return res.status(200).send('EVENT_PROCESSED');
+
+    } catch (error) {
+        console.error('Error processing webhook:', error);
+        // Still send 200 to prevent WhatsApp from resending, but log the error
+        return res.status(200).send('EVENT_RECEIVED_WITH_ERROR');
     }
-    res.status(500).json({ message: 'Failed to create campaign.' });
   }
+
+  // Handle other methods
+  res.setHeader('Allow', ['GET', 'POST']);
+  res.status(405).end('Method Not Allowed');
 }
