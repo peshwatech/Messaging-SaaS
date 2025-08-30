@@ -48,7 +48,7 @@ export function AnalyticsPage({ campaigns = [] }: { campaigns: Campaign[] }) {
     const avgClickRate = totalSent > 0 ? ((totalDelivered / totalSent) * 100).toFixed(1) : "0.0"; // Note: Click rate isn't tracked yet, using delivered as a placeholder
 
     const calculatedStats = [
-      { title: "Total Emails Sent", value: totalSent.toLocaleString(), icon: Mail },
+      { title: "Total Messages Sent", value: totalSent.toLocaleString(), icon: Mail },
       { title: "Average Open Rate", value: `${avgOpenRate}%`, icon: Eye },
       { title: "Average Delivery Rate", value: `${avgClickRate}%`, icon: MousePointer },
       { title: "Total Campaigns", value: campaigns.length, icon: Users },

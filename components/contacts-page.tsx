@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, Plus, Mail, Phone, MapPin, Filter, Download, Upload } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Toaster } from "@/components/ui/toaster"
+import { toast } from "@/components/ui/use-toast"
+import { getAuth } from "firebase/auth"
+import { app } from "@/lib/firebase"
+
 
 const contacts = [
   {
@@ -75,6 +82,8 @@ const contactStats = [
 export function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newContact, setNewContact] = useState({ name: "", email: "", phone: "", location: "" });
 
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
@@ -83,6 +92,57 @@ export function ContactsPage() {
     const matchesStatus = statusFilter === "all" || contact.status.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesStatus
   })
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Add Contact button clicked. New contact data:", newContact);
+
+    // Placeholder API call to demonstrate functionality
+    try {
+      // In a real app, you would make an API call here.
+      // const auth = getAuth(app);
+      // const user = auth.currentUser;
+      
+      // if (!user) {
+      //   toast({
+      //     title: "Error",
+      //     description: "You must be logged in to add a contact.",
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
+
+      // const token = await user.getIdToken();
+      // const response = await fetch('/api/contacts/add', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${token}`,
+      //   },
+      //   body: JSON.stringify(newContact),
+      // });
+
+      // if (!response.ok) {
+      //   throw new Error("Failed to add contact.");
+      // }
+
+      toast({
+        title: "Success",
+        description: "Contact added successfully! (Placeholder)",
+      });
+
+      setNewContact({ name: "", email: "", phone: "", location: "" });
+      setIsModalOpen(false);
+
+    } catch (error) {
+      console.error("Error adding contact:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add contact. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -97,10 +157,72 @@ export function ContactsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Contact
-          </Button>
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Contact
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add New Contact</DialogTitle>
+                <DialogDescription>
+                  Enter the details for a new contact to add to your database.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddContact} className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    value={newContact.name}
+                    onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Phone
+                  </Label>
+                  <Input
+                    id="phone"
+                    value={newContact.phone}
+                    onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="location" className="text-right">
+                    Location
+                  </Label>
+                  <Input
+                    id="location"
+                    value={newContact.location}
+                    onChange={(e) => setNewContact({ ...newContact, location: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="flex justify-end pt-4">
+                  <Button type="submit">Add Contact</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -217,6 +339,7 @@ export function ContactsPage() {
           </div>
         </CardContent>
       </Card>
+      <Toaster />
     </div>
   )
 }
