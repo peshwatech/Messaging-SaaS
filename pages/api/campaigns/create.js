@@ -1,40 +1,52 @@
 // File Location: /pages/api/campaigns/create.js
+// This API has been updated to be secure and multi-tenant aware.
 
-import { db } from '../../../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { Timestamp } from 'firebase-admin/firestore';
+import { initializeAdminApp, adminDb } from '../../../lib/firebaseAdmin'; // We need a new admin config file
 import axios from 'axios';
 
-// This API route handles the creation of a new messaging campaign.
+// Initialize the Firebase Admin SDK
+initializeAdminApp();
+
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { template, contacts } = req.body;
-
-  // --- Basic Validation ---
-  if (!template || !contacts || !Array.isArray(contacts) || contacts.length === 0) {
-    return res.status(400).json({ message: 'Invalid request body. Template and a non-empty contacts array are required.' });
-  }
-
-  // In a real multi-tenant app, you would get the tenantId from the user's authenticated session.
-  // For this example, we'll use a hardcoded value.
-  const tenantId = 'test-tenant'; // Replace with dynamic tenant ID from auth session later
-
   try {
-    // --- Step 1: Log the new campaign in Firestore ---
-    const campaignRef = await addDoc(collection(db, `tenants/${tenantId}/campaigns`), {
+    // 1. VERIFY USER TOKEN
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) {
+      return res.status(401).json({ message: 'Unauthorized: No token provided.' });
+    }
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid; // This is the user's unique ID, our new tenantId
+
+    // 2. VALIDATE REQUEST BODY
+    const { template, contacts } = req.body;
+    if (!template || !contacts || !Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ message: 'Invalid request body.' });
+    }
+
+    // 3. SAVE CAMPAIGN TO FIRESTORE (under the user's tenant)
+    const campaignData = {
       templateName: template,
       contactCount: contacts.length,
       status: 'in_progress',
-      createdAt: serverTimestamp(),
-    });
-    console.log(`Campaign logged with ID: ${campaignRef.id}`);
+      createdAt: Timestamp.now(),
+    };
+    
+    const campaignRef = await adminDb
+      .collection('tenants')
+      .doc(userId) // Use the authenticated user's UID as the document ID
+      .collection('campaigns')
+      .add(campaignData);
 
-    // --- Step 2: Send messages via WhatsApp Cloud API ---
-    // We create an array of promises for all the API calls.
+    console.log(`Campaign ${campaignRef.id} logged for user ${userId}`);
+
+    // 4. SEND MESSAGES VIA WHATSAPP API
     const sendMessagePromises = contacts.map(contactNumber => {
       return axios.post(
         `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
@@ -42,10 +54,7 @@ export default async function handler(req, res) {
           messaging_product: "whatsapp",
           to: contactNumber,
           type: "template",
-          template: {
-            name: template,
-            language: { code: "en_US" }
-          },
+          template: { name: template, language: { code: "en_US" } },
         },
         {
           headers: {
@@ -56,26 +65,15 @@ export default async function handler(req, res) {
       );
     });
 
-    // Use Promise.allSettled to wait for all messages to be sent, even if some fail.
-    const results = await Promise.allSettled(sendMessagePromises);
-
-    // Optional: Log the results for debugging
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        console.log(`Message sent to ${contacts[index]} successfully.`);
-      } else {
-        console.error(`Failed to send message to ${contacts[index]}:`, result.reason.response?.data || result.reason.message);
-      }
-    });
-
-    // --- Step 3: Update campaign status in Firestore (optional) ---
-    // In a more advanced setup, you might update the campaign status to 'completed'.
-    // For now, we'll skip this to keep it simple.
+    await Promise.allSettled(sendMessagePromises);
 
     res.status(200).json({ message: `Campaign created successfully! Attempted to send ${contacts.length} messages.` });
 
   } catch (error) {
-    console.error("Error creating campaign:", error.response?.data || error.message);
+    console.error("Error creating campaign:", error.code ? error.code : error.message);
+    if (error.code === 'auth/id-token-expired') {
+        return res.status(401).json({ message: 'Unauthorized: Token expired.' });
+    }
     res.status(500).json({ message: 'Failed to create campaign.' });
   }
 }

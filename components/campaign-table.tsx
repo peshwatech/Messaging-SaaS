@@ -1,0 +1,196 @@
+"use client"
+
+import { useState, useMemo } from "react"
+import { ChevronLeft, ChevronRight, Edit, Trash2, MoreHorizontal } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+interface Campaign {
+  id: string
+  name: string
+  contactCount: number
+  status: "sent" | "in-progress" | "failed"
+  dateSent: string
+}
+
+const mockCampaigns: Campaign[] = [
+  { id: "1", name: "Summer Sale 2024", contactCount: 15420, status: "sent", dateSent: "2024-06-15" },
+  { id: "2", name: "Product Launch Newsletter", contactCount: 8750, status: "in-progress", dateSent: "2024-06-20" },
+  { id: "3", name: "Customer Feedback Survey", contactCount: 12300, status: "sent", dateSent: "2024-06-18" },
+  { id: "4", name: "Holiday Promotion", contactCount: 22100, status: "failed", dateSent: "2024-06-12" },
+  { id: "5", name: "Welcome Series - Part 1", contactCount: 5600, status: "sent", dateSent: "2024-06-22" },
+  { id: "6", name: "Abandoned Cart Recovery", contactCount: 3400, status: "in-progress", dateSent: "2024-06-25" },
+  { id: "7", name: "Monthly Newsletter", contactCount: 18900, status: "sent", dateSent: "2024-06-10" },
+  { id: "8", name: "Flash Sale Alert", contactCount: 9800, status: "failed", dateSent: "2024-06-14" },
+  { id: "9", name: "User Onboarding Series", contactCount: 7200, status: "in-progress", dateSent: "2024-06-28" },
+  { id: "10", name: "Re-engagement Campaign", contactCount: 11500, status: "sent", dateSent: "2024-06-16" },
+]
+
+interface CampaignTableProps {
+  searchTerm: string
+  statusFilter: string
+  dateRange: { from: string; to: string }
+}
+
+export function CampaignTable({ searchTerm, statusFilter, dateRange }: CampaignTableProps) {
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 5
+
+  const filteredCampaigns = useMemo(() => {
+    return mockCampaigns.filter((campaign) => {
+      const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = statusFilter === "all" || campaign.status === statusFilter
+
+      let matchesDateRange = true
+      if (dateRange.from || dateRange.to) {
+        const campaignDate = new Date(campaign.dateSent)
+        if (dateRange.from) {
+          matchesDateRange = matchesDateRange && campaignDate >= new Date(dateRange.from)
+        }
+        if (dateRange.to) {
+          matchesDateRange = matchesDateRange && campaignDate <= new Date(dateRange.to)
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesDateRange
+    })
+  }, [searchTerm, statusFilter, dateRange])
+
+  const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedCampaigns = filteredCampaigns.slice(startIndex, startIndex + itemsPerPage)
+
+  const getStatusBadge = (status: Campaign["status"]) => {
+    switch (status) {
+      case "sent":
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+            Sent
+          </Badge>
+        )
+      case "in-progress":
+        return (
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+            In Progress
+          </Badge>
+        )
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  const formatContactCount = (count: number) => {
+    return count.toLocaleString()
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="font-semibold">Campaign Name</TableHead>
+              <TableHead className="font-semibold">Contact Count</TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Date Sent</TableHead>
+              <TableHead className="font-semibold w-12">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedCampaigns.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No campaigns found matching your criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedCampaigns.map((campaign) => (
+                <TableRow key={campaign.id} className="hover:bg-muted/30">
+                  <TableCell className="font-medium">{campaign.name}</TableCell>
+                  <TableCell>{formatContactCount(campaign.contactCount)}</TableCell>
+                  <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                  <TableCell>{formatDate(campaign.dateSent)}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredCampaigns.length)} of{" "}
+          {filteredCampaigns.length} campaigns
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentPage(page)}
+                className="w-8 h-8 p-0"
+              >
+                {page}
+              </Button>
+            ))}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

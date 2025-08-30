@@ -1,26 +1,22 @@
-// File Location: /firestore.rules (in your project root)
-// This file's contents should be copied into your Firebase project's Firestore security rules editor.
+// File Location: /firestore.rules
+// These rules have been updated to use the user's UID for multi-tenancy,
+// which is compatible with the standard Firebase Authentication in your new UI.
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Deny all reads and writes by default for security.
+    // Deny all reads and writes by default.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // This rule specifically matches any document inside any subcollection of a tenant.
-    // e.g., /tenants/tenant-abc/campaigns/campaign-123
-    // e.g., /tenants/tenant-xyz/contacts/contact-456
-    match /tenants/{tenantId}/{anyCollection}/{docId} {
-      
-      // Allow read and write access ONLY if the requesting user's
-      // authentication token has a custom claim 'tenantId' that
-      // exactly matches the {tenantId} in the document path.
-      // This is the core of our multi-tenant security model.
-      allow read, write: if request.auth.token.tenantId == tenantId;
+    // This rule allows a logged-in user to read and write documents
+    // ONLY within their own subcollection inside the 'tenants' collection.
+    // The {userId} wildcard must match the UID of the authenticated user.
+    // This is the standard and secure way to handle multi-tenancy with Firebase Auth.
+    match /tenants/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
