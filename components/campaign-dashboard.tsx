@@ -18,6 +18,9 @@ export default function CampaignDashboard() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [dateRange, setDateRange] = useState({ from: "", to: "" })
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -102,10 +105,22 @@ export default function CampaignDashboard() {
               <h1 className="text-3xl font-bold text-foreground">Campaign Management</h1>
             </div>
             <Card className="p-6">
-              <SearchAndFilters />
+              <SearchAndFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                statusFilter={statusFilter}
+                onStatusChange={setStatusFilter}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
             </Card>
             <Card className="p-6">
-              <CampaignTable campaigns={campaigns} />
+              <CampaignTable
+                campaigns={campaigns}
+                searchTerm={searchTerm}
+                statusFilter={statusFilter}
+                dateRange={dateRange}
+              />
             </Card>
           </div>
         )
@@ -127,4 +142,3 @@ export default function CampaignDashboard() {
     </div>
   )
 }
-

@@ -15,31 +15,19 @@ interface Campaign {
   dateSent: string
 }
 
-const mockCampaigns: Campaign[] = [
-  { id: "1", name: "Summer Sale 2024", contactCount: 15420, status: "sent", dateSent: "2024-06-15" },
-  { id: "2", name: "Product Launch Newsletter", contactCount: 8750, status: "in-progress", dateSent: "2024-06-20" },
-  { id: "3", name: "Customer Feedback Survey", contactCount: 12300, status: "sent", dateSent: "2024-06-18" },
-  { id: "4", name: "Holiday Promotion", contactCount: 22100, status: "failed", dateSent: "2024-06-12" },
-  { id: "5", name: "Welcome Series - Part 1", contactCount: 5600, status: "sent", dateSent: "2024-06-22" },
-  { id: "6", name: "Abandoned Cart Recovery", contactCount: 3400, status: "in-progress", dateSent: "2024-06-25" },
-  { id: "7", name: "Monthly Newsletter", contactCount: 18900, status: "sent", dateSent: "2024-06-10" },
-  { id: "8", name: "Flash Sale Alert", contactCount: 9800, status: "failed", dateSent: "2024-06-14" },
-  { id: "9", name: "User Onboarding Series", contactCount: 7200, status: "in-progress", dateSent: "2024-06-28" },
-  { id: "10", name: "Re-engagement Campaign", contactCount: 11500, status: "sent", dateSent: "2024-06-16" },
-]
-
 interface CampaignTableProps {
+  campaigns: Campaign[]
   searchTerm: string
   statusFilter: string
   dateRange: { from: string; to: string }
 }
 
-export function CampaignTable({ searchTerm, statusFilter, dateRange }: CampaignTableProps) {
+export function CampaignTable({ campaigns, searchTerm, statusFilter, dateRange }: CampaignTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5
 
   const filteredCampaigns = useMemo(() => {
-    return mockCampaigns.filter((campaign) => {
+    return campaigns.filter((campaign) => {
       const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = statusFilter === "all" || campaign.status === statusFilter
 
@@ -56,7 +44,7 @@ export function CampaignTable({ searchTerm, statusFilter, dateRange }: CampaignT
 
       return matchesSearch && matchesStatus && matchesDateRange
     })
-  }, [searchTerm, statusFilter, dateRange])
+  }, [campaigns, searchTerm, statusFilter, dateRange])
 
   const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
